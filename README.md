@@ -1,10 +1,10 @@
-# Tetris in C# Console
-
+# :joystick: Tetris in C# Console
 The all so popular block stacking game re-created in the console using C# and the .NET Core.
 
-## Visuals
+## :flower_playing_cards: Visuals
+* Coming soon!
 
-## Created Using
+## :desktop_computer: Created Using
 * Visual Studio 2022
 * .NET Core 3.1
 * C# 8.0
