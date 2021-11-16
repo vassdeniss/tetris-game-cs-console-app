@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace TetrisCsConsole
@@ -9,6 +10,7 @@ namespace TetrisCsConsole
     internal class Program
     {
         // Settings
+        static string ScoreFileName = "YourHighScores.txt";
         static int GameFieldRows = 20;
         static int GameFieldCols = 10;
         static int InfoFieldCols = 10;
@@ -44,7 +46,7 @@ namespace TetrisCsConsole
             {
                 { true, false, false },
                 { true, true, true }
-            },  
+            },
             new bool[,] // L
             {
                 { false, false, true },
@@ -54,6 +56,7 @@ namespace TetrisCsConsole
 
         // States 
         static Random RandomTetromino = new Random();
+        static int HighScore = 0;
         static int Score = 0;
         static int Frame = 0;
         static int MoveFrame = 20;
@@ -61,9 +64,21 @@ namespace TetrisCsConsole
         static int TetrominoRow = 0;
         static int TetrominoCol = 0;
         static bool[,] GameField = new bool[GameFieldRows, GameFieldCols];
+        static int[] LineScores = { 0, 40, 100, 300, 1200 };
 
         static void Main(string[] args)
         {
+            if (File.Exists(ScoreFileName))
+            {
+                string[] scores = File.ReadAllLines(ScoreFileName);
+
+                foreach (string score in scores)
+                {
+                    Match scorePattern = Regex.Match(score, @" => (?<score>[0-9]+)");
+                    HighScore = Math.Max(HighScore, int.Parse(scorePattern.Groups["score"].Value));
+                }
+            }
+
             Console.Title = "Tetris in the Console";
             Console.CursorVisible = false;
             Console.SetWindowSize(ConsoleWidth, ConsoleHeight + 1);
@@ -86,24 +101,20 @@ namespace TetrisCsConsole
                         case ConsoleKey.W:
                         case ConsoleKey.UpArrow:
                         case ConsoleKey.Spacebar:
-                            // TODO: RotateTetromino()
                             break;
                         case ConsoleKey.S:
                         case ConsoleKey.DownArrow:
-                            // TODO: MoveTetrominoDown()
-                            TetrominoRow++; // Out of bounds check
+                            TetrominoRow++;
                             Frame = 1;
                             Score++;
                             break;
                         case ConsoleKey.A:
                         case ConsoleKey.LeftArrow:
-                            // TODO: MoveTetrominoLeft()
-                            if (TetrominoCol > 0) TetrominoCol--;
+                            if (TetrominoCol > 0 && !CollisionSideLeft()) TetrominoCol--;
                             break;
                         case ConsoleKey.D:
                         case ConsoleKey.RightArrow:
-                            // TODO: MoveTetrominoRight()
-                            if (TetrominoCol < GameFieldCols - CurrentTetromino.GetLength(0) - 1) TetrominoCol++;
+                            if (TetrominoCol < GameFieldCols - CurrentTetromino.GetLength(1) && !CollisionSideRight()) TetrominoCol++;
                             break;
                     }
                 }
@@ -118,13 +129,15 @@ namespace TetrisCsConsole
                 if (Collision())
                 {
                     AddToGameField();
+                    int lines = CheckFullLines();
+                    Score += LineScores[lines];
                     CurrentTetromino = Tetrominos[RandomTetromino.Next(0, Tetrominos.Count)];
                     TetrominoCol = 0;
                     TetrominoRow = 0;
 
                     if (Collision())
                     {
-                        File.AppendAllLines("Scores.txt", new List<string>
+                        File.AppendAllLines(ScoreFileName, new List<string>
                         {
                             $"[{DateTime.Now}] {Environment.UserName} => {Score}"
                         });
@@ -134,8 +147,6 @@ namespace TetrisCsConsole
                         return;
                     }
                 }
-                // check for lines 
-                //  - increment score 
 
                 // Update UI
                 DrawBorder();
@@ -146,6 +157,44 @@ namespace TetrisCsConsole
             }
         }
 
+        static bool CollisionSideLeft()
+        {
+            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            {
+                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                {
+                    if (TetrominoCol + col - 1 > -1 && TetrominoCol + col + 1 < GameField.GetLength(1))
+                    {
+                        if (GameField[TetrominoRow + row, TetrominoCol + col - 1])
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        static bool CollisionSideRight()
+        {
+            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            {
+                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                {
+                    if (TetrominoCol + col - 1 > -1 && TetrominoCol + col + 1 < GameField.GetLength(1))
+                    {
+                        if (GameField[TetrominoRow + row, TetrominoCol + col + 1])
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
         static bool Collision()
         {
             if (TetrominoRow + CurrentTetromino.GetLength(0) == GameFieldRows) return true;
@@ -154,7 +203,7 @@ namespace TetrisCsConsole
             {
                 for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
                 {
-                    if (CurrentTetromino[row, col] && (GameField[TetrominoRow + row + 1, TetrominoCol + col] || GameField[TetrominoRow + row, TetrominoCol + col]))
+                    if (CurrentTetromino[row, col] && GameField[TetrominoRow + row + 1, TetrominoCol + col])
                     {
                         return true;
                     }
@@ -162,6 +211,39 @@ namespace TetrisCsConsole
             }
 
             return false;
+        }
+
+        static int CheckFullLines()
+        {
+            int lines = 0;
+
+            for (int row = 0; row < GameField.GetLength(0); row++)
+            {
+                bool isLineFull = true;
+                for (int col = 0; col < GameField.GetLength(1); col++)
+                {
+                    if (!GameField[row, col])
+                    {
+                        isLineFull = false;
+                        break;
+                    }
+                }
+
+                if (isLineFull)
+                {
+                    for (int rowMove = row; rowMove >= 1; rowMove--)
+                    {
+                        for (int col = 0; col < GameField.GetLength(1); col++)
+                        {
+                            GameField[rowMove, col] = GameField[rowMove - 1, col];
+                        }
+                    }
+
+                    lines++;
+                }
+            }
+
+            return lines;
         }
 
         static void AddToGameField()
@@ -180,29 +262,37 @@ namespace TetrisCsConsole
 
         static void DrawField()
         {
+            Console.ForegroundColor = ConsoleColor.DarkBlue;
             for (int row = 0; row < GameField.GetLength(0); row++)
             {
+                StringBuilder sb = new StringBuilder();
                 for (int col = 0; col < GameField.GetLength(1); col++)
                 {
                     if (GameField[row, col])
-                    {
-                        Write("*", col + 1, row + 1, ConsoleColor.DarkGreen);
-                    }
+                        sb.Append("*");
+                    else
+                        sb.Append(" ");
                 }
+
+                Write(sb.ToString(), 1, row + 1);
             }
         }
 
         static void DrawTetromino()
         {
+            Console.ForegroundColor = ConsoleColor.Green;
             for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
             {
+                StringBuilder sb = new StringBuilder();
                 for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
                 {
                     if (CurrentTetromino[row, col])
-                    {
-                        Write($"*", col + 1 + TetrominoCol, row + 1 + TetrominoRow, ConsoleColor.Green);
-                    }
+                        sb.Append("*");
+                    else
+                        sb.Append(" ");
                 }
+
+                Write(sb.ToString(), 1 + TetrominoCol, row + 1 + TetrominoRow);
             }
         }
 
@@ -211,26 +301,23 @@ namespace TetrisCsConsole
             string scoreAsString = Score.ToString();
             scoreAsString += new string(' ', 7 - scoreAsString.Length);
 
-            ConsoleColor borderColor = ConsoleColor.DarkYellow;
-            ConsoleColor gameOverColor = ConsoleColor.Red;
-            ConsoleColor scoreColor = ConsoleColor.Green;
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Write("╔═════════╗", 5, 5);
+            Write("║ ", 5, 6); Write("    ║", 11, 6);
+            Write("║  ", 5, 7); Write("  ║", 13, 7);
+            Write("║ ", 5, 8); Write("  ║", 13, 8);
+            Write("║ ", 5, 9); Write("║", 15, 9);
+            Write("╚═════════╝", 5, 10);
 
-            Write("╔═════════╗", 5, 5, borderColor);
-            Write("║", 5, 6, borderColor);
-            Write("Game    ", 7, 6, gameOverColor);
-            Write("║", 15, 6, borderColor);
-            Write("║", 5, 7, borderColor);
-            Write("Over! ", 9, 7, gameOverColor);
-            Write("║", 15, 7, borderColor);
-            Write("║", 5, 8, borderColor);
-            Write("Score:    ", 7, 8, scoreColor);
-            Write("║", 15, 8, borderColor);
-            Write("║", 5, 9, borderColor);
-            Write($"{scoreAsString} ", 9, 9, scoreColor);
-            Write("║", 15, 9, borderColor);
-            Write("╚═════════╝", 5, 10, borderColor);
+            Console.ForegroundColor = ConsoleColor.Red;
+            Write("Game", 7, 6);
+            Write("Over!", 8, 7);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Write("Score:", 7, 8);
+            Write($"{scoreAsString}", 7, 9);
         }
-        
+
         static void DrawBorder()
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
@@ -265,32 +352,35 @@ namespace TetrisCsConsole
             bottomLine.Append('═', InfoFieldCols);
             bottomLine.Append('╝');
             Console.WriteLine(bottomLine);
-
-            Console.ResetColor();
         }
 
         static void DrawInfo()
         {
-            Write("Score:", GameFieldCols + 3, 1, ConsoleColor.Red);
-            Write(Score.ToString(), GameFieldCols + 3, 2, ConsoleColor.Red);
+            if (Score > HighScore) HighScore = Score;
 
-            Write("Frame:", GameFieldCols + 3, 4, ConsoleColor.Red);
-            Write(Frame.ToString(), GameFieldCols + 3, 5, ConsoleColor.Red);
+            Console.ForegroundColor = ConsoleColor.Red;
 
-            Write("Pos:", GameFieldCols + 3, 7, ConsoleColor.Red);
-            Write($"{TetrominoRow}, {TetrominoCol}", GameFieldCols + 3, 8, ConsoleColor.Red);
+            Write("Score:", GameFieldCols + 3, 1);
+            Write(Score.ToString(), GameFieldCols + 3, 2);
 
-            Write("Controls:", GameFieldCols + 3, 10, ConsoleColor.Red);
-            Write("   ^", GameFieldCols + 3, 12, ConsoleColor.Red);
-            Write(" < v >", GameFieldCols + 3, 13, ConsoleColor.Red);
+            Write("Best:", GameFieldCols + 3, 4);
+            Write(HighScore.ToString(), GameFieldCols + 3, 5);
+
+            Write("Frame:", GameFieldCols + 3, 7);
+            Write(Frame.ToString(), GameFieldCols + 3, 8);
+
+            Write("Pos:", GameFieldCols + 3, 10);
+            Write($"{TetrominoRow}, {TetrominoCol}", GameFieldCols + 3, 11);
+
+            Write("Controls:", GameFieldCols + 3, 13);
+            Write("   ^", GameFieldCols + 3, 15);
+            Write(" < v >", GameFieldCols + 3, 16);
         }
 
-        static void Write(string text, int col, int row, ConsoleColor color)
+        static void Write(string text, int col, int row)
         {
-            Console.ForegroundColor = color;
             Console.SetCursorPosition(col, row);
             Console.Write(text);
-            Console.ResetColor();
         }
     }
 }
