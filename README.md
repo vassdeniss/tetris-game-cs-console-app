@@ -2,9 +2,9 @@
 The all so popular block stacking game re-created in the console using C# and the .NET Core.
 
 ## :flower_playing_cards: Visuals
-* [visual_one](https://softwareuniversity-my.sharepoint.com/personal/vassdeniss_students_softuni_bg/Documents/Projects/C%23/tetris-game-cs-console-app-visuals/visual_one.png)
-* [visual_two](https://softwareuniversity-my.sharepoint.com/personal/vassdeniss_students_softuni_bg/Documents/Projects/C%23/tetris-game-cs-console-app-visuals/visual_two.png)
-* [visual_three](https://softwareuniversity-my.sharepoint.com/personal/vassdeniss_students_softuni_bg/Documents/Projects/C%23/tetris-game-cs-console-app-visuals/visual_three.png)
+![visual_one](https://github.com/vassdeniss/tetris-game-cs-console-app/blob/master/Visuals/visual_one.png)
+![visual_two](https://github.com/vassdeniss/tetris-game-cs-console-app/blob/master/Visuals/visual_two.png)
+![visual_three](https://github.com/vassdeniss/tetris-game-cs-console-app/blob/master/Visuals/visual_three.png)
 
 ## :desktop_computer: Created Using
 * Visual Studio 2022
