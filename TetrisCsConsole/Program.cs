@@ -101,6 +101,7 @@ namespace TetrisCsConsole
                         case ConsoleKey.W:
                         case ConsoleKey.UpArrow:
                         case ConsoleKey.Spacebar:
+                            RotateTetromino();
                             break;
                         case ConsoleKey.S:
                         case ConsoleKey.DownArrow:
@@ -114,7 +115,8 @@ namespace TetrisCsConsole
                             break;
                         case ConsoleKey.D:
                         case ConsoleKey.RightArrow:
-                            if (TetrominoCol < GameFieldCols - CurrentTetromino.GetLength(1) && !CollisionSideRight()) TetrominoCol++;
+                            if (TetrominoCol < GameFieldCols - CurrentTetromino.GetLength(1) && !CollisionSideRight())
+                                TetrominoCol++;
                             break;
                     }
                 }
@@ -126,7 +128,7 @@ namespace TetrisCsConsole
                     Frame = 0;
                 }
 
-                if (Collision())
+                if (Collision(CurrentTetromino))
                 {
                     AddToGameField();
                     int lines = CheckFullLines();
@@ -135,7 +137,7 @@ namespace TetrisCsConsole
                     TetrominoCol = 0;
                     TetrominoRow = 0;
 
-                    if (Collision())
+                    if (Collision(CurrentTetromino))
                     {
                         File.AppendAllLines(ScoreFileName, new List<string>
                         {
@@ -195,15 +197,17 @@ namespace TetrisCsConsole
             return false;
         }
 
-        static bool Collision()
+        static bool Collision(bool[,] tetromino)
         {
-            if (TetrominoRow + CurrentTetromino.GetLength(0) == GameFieldRows) return true;
+            if (TetrominoCol > GameFieldCols - tetromino.GetLength(1)) return true;
 
-            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            if (TetrominoRow + tetromino.GetLength(0) == GameFieldRows) return true;
+
+            for (int row = 0; row < tetromino.GetLength(0); row++)
             {
-                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                for (int col = 0; col < tetromino.GetLength(1); col++)
                 {
-                    if (CurrentTetromino[row, col] && GameField[TetrominoRow + row + 1, TetrominoCol + col])
+                    if (tetromino[row, col] && GameField[TetrominoRow + row + 1, TetrominoCol + col])
                     {
                         return true;
                     }
@@ -260,9 +264,24 @@ namespace TetrisCsConsole
             }
         }
 
+        static void RotateTetromino()
+        {
+            bool[,] rotatedTetromino = new bool[CurrentTetromino.GetLength(1), CurrentTetromino.GetLength(0)];
+
+            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            {
+                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                {
+                    rotatedTetromino[col, CurrentTetromino.GetLength(0) - row - 1] = CurrentTetromino[row, col];
+                }
+            }
+
+            if (!Collision(rotatedTetromino)) CurrentTetromino = rotatedTetromino;
+        }
+
         static void DrawField()
         {
-            Console.ForegroundColor = ConsoleColor.DarkBlue;
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
             for (int row = 0; row < GameField.GetLength(0); row++)
             {
                 StringBuilder sb = new StringBuilder();
@@ -301,6 +320,7 @@ namespace TetrisCsConsole
             string scoreAsString = Score.ToString();
             scoreAsString += new string(' ', 7 - scoreAsString.Length);
 
+            // Print border
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Write("╔═════════╗", 5, 5);
             Write("║ ", 5, 6); Write("    ║", 11, 6);
@@ -309,10 +329,12 @@ namespace TetrisCsConsole
             Write("║ ", 5, 9); Write("║", 15, 9);
             Write("╚═════════╝", 5, 10);
 
+            // Print game over
             Console.ForegroundColor = ConsoleColor.Red;
             Write("Game", 7, 6);
             Write("Over!", 8, 7);
 
+            // Print score
             Console.ForegroundColor = ConsoleColor.Green;
             Write("Score:", 7, 8);
             Write($"{scoreAsString}", 7, 9);
