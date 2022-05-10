@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace TetrisCsConsole
@@ -10,13 +8,12 @@ namespace TetrisCsConsole
     internal class Program
     {
         // Settings
-        static string ScoreFileName = "YourHighScores.txt";
-        static int GameFieldRows = 20;
-        static int GameFieldCols = 10;
-        static int InfoFieldCols = 10;
-        static int ConsoleHeight = 1 + GameFieldRows + 1;
-        static int ConsoleWidth = 1 + GameFieldCols + 1 + InfoFieldCols + 1;
-        static List<bool[,]> Tetrominos = new List<bool[,]>()
+        static readonly int GameFieldRows = 20;
+        static readonly int GameFieldCols = 10;
+        static readonly int InfoFieldCols = 10;
+        static readonly int ConsoleHeight = 1 + GameFieldRows + 1;
+        static readonly int ConsoleWidth = 1 + GameFieldCols + 1 + InfoFieldCols + 1;
+        static readonly List<bool[,]> Tetrominos = new List<bool[,]>()
         {
             new bool[,] // I
             {
@@ -55,43 +52,27 @@ namespace TetrisCsConsole
         };
 
         // States 
-        static Random RandomTetromino = new Random();
-        static int HighScore = 0;
-        static int Score = 0;
-        static int Level = 1;
-        static int Frame = 0;
-        static int MoveFrame = 16;
-        static bool[,] CurrentTetromino = null;
-        static int TetrominoRow = 0;
-        static int TetrominoCol = 0;
-        static bool[,] GameField = new bool[GameFieldRows, GameFieldCols];
-        static int[] LineScores = { 0, 40, 100, 300, 1200 };
+        static readonly GameState State = new GameState(GameFieldRows, GameFieldCols);
+        static readonly Random RandomTetromino = new Random();
 
-        static void Main(string[] args)
+        static void Main()
         {
-            new Thread(PlayMusic).Start();
+            MusicPlayer player = new MusicPlayer();
+            player.Play();
 
-            if (File.Exists(ScoreFileName))
-            {
-                string[] scores = File.ReadAllLines(ScoreFileName);
-
-                foreach (string score in scores)
-                {
-                    Match scorePattern = Regex.Match(score, @" => (?<score>[0-9]+)");
-                    HighScore = Math.Max(HighScore, int.Parse(scorePattern.Groups["score"].Value));
-                }
-            }
+            ScoreManager manager = new ScoreManager("YourHighScores.txt");
+            State.HighScore = manager.GetHighScore();
 
             Console.Title = "Tetris in the Console";
             Console.CursorVisible = false;
             Console.SetWindowSize(ConsoleWidth, ConsoleHeight + 1);
             Console.SetBufferSize(ConsoleWidth, ConsoleHeight + 1);
 
-            CurrentTetromino = Tetrominos[RandomTetromino.Next(0, Tetrominos.Count)];
+            State.CurrentTetromino = Tetrominos[RandomTetromino.Next(0, Tetrominos.Count)];
             while (true)
             {
-                Frame++;
-                UpdateLevel();
+                State.Frame++;
+                State.UpdateLevel();
 
                 // User Input
                 if (Console.KeyAvailable)
@@ -109,45 +90,41 @@ namespace TetrisCsConsole
                             break;
                         case ConsoleKey.S:
                         case ConsoleKey.DownArrow:
-                            TetrominoRow++;
-                            Frame = 1;
-                            Score += Level;
+                            State.TetrominoRow++;
+                            State.Frame = 1;
+                            State.Score += State.Level;
                             break;
                         case ConsoleKey.A:
                         case ConsoleKey.LeftArrow:
-                            if (TetrominoCol > 0 && !CollisionSideLeft()) TetrominoCol--;
+                            if (State.TetrominoCol > 0 && !CollisionSideLeft()) State.TetrominoCol--;
                             break;
                         case ConsoleKey.D:
                         case ConsoleKey.RightArrow:
-                            if (TetrominoCol < GameFieldCols - CurrentTetromino.GetLength(1) && !CollisionSideRight())
-                                TetrominoCol++;
+                            if (State.TetrominoCol < GameFieldCols - State.CurrentTetromino.GetLength(1) && !CollisionSideRight())
+                                State.TetrominoCol++;
                             break;
                     }
                 }
 
                 // Update Game State
-                if (Frame % (MoveFrame - Level) == 0)
+                if (State.Frame % (State.MoveFrame - State.Level) == 0)
                 {
-                    TetrominoRow++;
-                    Frame = 0;
+                    State.TetrominoRow++;
+                    State.Frame = 0;
                 }
 
-                if (Collision(CurrentTetromino))
+                if (Collision(State.CurrentTetromino))
                 {
                     AddToGameField();
                     int lines = CheckFullLines();
-                    Score += LineScores[lines];
-                    CurrentTetromino = Tetrominos[RandomTetromino.Next(0, Tetrominos.Count)];
-                    TetrominoCol = 0;
-                    TetrominoRow = 0;
+                    State.Score += State.LineScores[lines];
+                    State.CurrentTetromino = Tetrominos[RandomTetromino.Next(0, Tetrominos.Count)];
+                    State.TetrominoCol = 0;
+                    State.TetrominoRow = 0;
 
-                    if (Collision(CurrentTetromino))
+                    if (Collision(State.CurrentTetromino))
                     {
-                        File.AppendAllLines(ScoreFileName, new List<string>
-                        {
-                            $"[{DateTime.Now}] {Environment.UserName} => {Score}"
-                        });
-
+                        manager.PostHighScore(State.Score);
                         PrintGameOver();
                         Thread.Sleep(100000);
                         return;
@@ -165,13 +142,13 @@ namespace TetrisCsConsole
 
         static bool CollisionSideLeft()
         {
-            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            for (int row = 0; row < State.CurrentTetromino.GetLength(0); row++)
             {
-                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                for (int col = 0; col < State.CurrentTetromino.GetLength(1); col++)
                 {
-                    if (TetrominoCol + col - 1 > -1 && TetrominoCol + col + 1 < GameField.GetLength(1))
+                    if (State.TetrominoCol + col - 1 > -1 && State.TetrominoCol + col + 1 < State.GameField.GetLength(1))
                     {
-                        if (GameField[TetrominoRow + row, TetrominoCol + col - 1])
+                        if (State.GameField[State.TetrominoRow + row, State.TetrominoCol + col - 1])
                         {
                             return true;
                         }
@@ -184,13 +161,13 @@ namespace TetrisCsConsole
 
         static bool CollisionSideRight()
         {
-            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            for (int row = 0; row < State.CurrentTetromino.GetLength(0); row++)
             {
-                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                for (int col = 0; col < State.CurrentTetromino.GetLength(1); col++)
                 {
-                    if (TetrominoCol + col - 1 > -1 && TetrominoCol + col + 1 < GameField.GetLength(1))
+                    if (State.TetrominoCol + col - 1 > -1 && State.TetrominoCol + col + 1 < State.GameField.GetLength(1))
                     {
-                        if (GameField[TetrominoRow + row, TetrominoCol + col + 1])
+                        if (State.GameField[State.TetrominoRow + row, State.TetrominoCol + col + 1])
                         {
                             return true;
                         }
@@ -203,15 +180,15 @@ namespace TetrisCsConsole
 
         static bool Collision(bool[,] tetromino)
         {
-            if (TetrominoCol > GameFieldCols - tetromino.GetLength(1)) return true;
+            if (State.TetrominoCol > GameFieldCols - tetromino.GetLength(1)) return true;
 
-            if (TetrominoRow + tetromino.GetLength(0) == GameFieldRows) return true;
+            if (State.TetrominoRow + tetromino.GetLength(0) == GameFieldRows) return true;
 
             for (int row = 0; row < tetromino.GetLength(0); row++)
             {
                 for (int col = 0; col < tetromino.GetLength(1); col++)
                 {
-                    if (tetromino[row, col] && GameField[TetrominoRow + row + 1, TetrominoCol + col])
+                    if (tetromino[row, col] && State.GameField[State.TetrominoRow + row + 1, State.TetrominoCol + col])
                     {
                         return true;
                     }
@@ -225,12 +202,12 @@ namespace TetrisCsConsole
         {
             int lines = 0;
 
-            for (int row = 0; row < GameField.GetLength(0); row++)
+            for (int row = 0; row < State.GameField.GetLength(0); row++)
             {
                 bool isLineFull = true;
-                for (int col = 0; col < GameField.GetLength(1); col++)
+                for (int col = 0; col < State.GameField.GetLength(1); col++)
                 {
-                    if (!GameField[row, col])
+                    if (!State.GameField[row, col])
                     {
                         isLineFull = false;
                         break;
@@ -241,9 +218,9 @@ namespace TetrisCsConsole
                 {
                     for (int rowMove = row; rowMove >= 1; rowMove--)
                     {
-                        for (int col = 0; col < GameField.GetLength(1); col++)
+                        for (int col = 0; col < State.GameField.GetLength(1); col++)
                         {
-                            GameField[rowMove, col] = GameField[rowMove - 1, col];
+                            State.GameField[rowMove, col] = State.GameField[rowMove - 1, col];
                         }
                     }
 
@@ -256,13 +233,13 @@ namespace TetrisCsConsole
 
         static void AddToGameField()
         {
-            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            for (int row = 0; row < State.CurrentTetromino.GetLength(0); row++)
             {
-                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                for (int col = 0; col < State.CurrentTetromino.GetLength(1); col++)
                 {
-                    if (CurrentTetromino[row, col])
+                    if (State.CurrentTetromino[row, col])
                     {
-                        GameField[TetrominoRow + row, TetrominoCol + col] = true;
+                        State.GameField[State.TetrominoRow + row, State.TetrominoCol + col] = true;
                     }
                 }
             }
@@ -270,28 +247,28 @@ namespace TetrisCsConsole
 
         static void RotateTetromino()
         {
-            bool[,] rotatedTetromino = new bool[CurrentTetromino.GetLength(1), CurrentTetromino.GetLength(0)];
+            bool[,] rotatedTetromino = new bool[State.CurrentTetromino.GetLength(1), State.CurrentTetromino.GetLength(0)];
 
-            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            for (int row = 0; row < State.CurrentTetromino.GetLength(0); row++)
             {
-                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                for (int col = 0; col < State.CurrentTetromino.GetLength(1); col++)
                 {
-                    rotatedTetromino[col, CurrentTetromino.GetLength(0) - row - 1] = CurrentTetromino[row, col];
+                    rotatedTetromino[col, State.CurrentTetromino.GetLength(0) - row - 1] = State.CurrentTetromino[row, col];
                 }
             }
 
-            if (!Collision(rotatedTetromino)) CurrentTetromino = rotatedTetromino;
+            if (!Collision(rotatedTetromino)) State.CurrentTetromino = rotatedTetromino;
         }
 
         static void DrawField()
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
-            for (int row = 0; row < GameField.GetLength(0); row++)
+            for (int row = 0; row < State.GameField.GetLength(0); row++)
             {
                 StringBuilder sb = new StringBuilder();
-                for (int col = 0; col < GameField.GetLength(1); col++)
+                for (int col = 0; col < State.GameField.GetLength(1); col++)
                 {
-                    if (GameField[row, col])
+                    if (State.GameField[row, col])
                         sb.Append("*");
                     else
                         sb.Append(" ");
@@ -304,19 +281,19 @@ namespace TetrisCsConsole
         static void DrawTetromino()
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            for (int row = 0; row < CurrentTetromino.GetLength(0); row++)
+            for (int row = 0; row < State.CurrentTetromino.GetLength(0); row++)
             {
-                for (int col = 0; col < CurrentTetromino.GetLength(1); col++)
+                for (int col = 0; col < State.CurrentTetromino.GetLength(1); col++)
                 {
-                    if (CurrentTetromino[row, col])
-                        Write("*", 1 + TetrominoCol + col, row + 1 + TetrominoRow);
+                    if (State.CurrentTetromino[row, col])
+                        Write("*", 1 + State.TetrominoCol + col, row + 1 + State.TetrominoRow);
                 }
             }
         }
 
         static void PrintGameOver()
         {
-            string scoreAsString = Score.ToString();
+            string scoreAsString = State.Score.ToString();
             scoreAsString += new string(' ', 7 - scoreAsString.Length);
 
             // Print border
@@ -377,24 +354,24 @@ namespace TetrisCsConsole
 
         static void DrawInfo()
         {
-            if (Score > HighScore) HighScore = Score;
+            if (State.Score > State.HighScore) State.HighScore = State.Score;
 
             Console.ForegroundColor = ConsoleColor.Red;
 
             Write("Level:", GameFieldCols + 3, 1);
-            Write($"{Level} / 10", GameFieldCols + 3, 2);
+            Write($"{State.Level} / 10", GameFieldCols + 3, 2);
 
             Write("Score:", GameFieldCols + 3, 4);
-            Write(Score.ToString(), GameFieldCols + 3, 5);
+            Write(State.Score.ToString(), GameFieldCols + 3, 5);
 
             Write("Best:", GameFieldCols + 3, 7);
-            Write(HighScore.ToString(), GameFieldCols + 3, 8);
+            Write(State.HighScore.ToString(), GameFieldCols + 3, 8);
 
             Write("Frame:", GameFieldCols + 3, 10);
-            Write($"{Frame} / {MoveFrame - Level}", GameFieldCols + 3, 11);
+            Write($"{State.Frame} / {State.MoveFrame - State.Level}", GameFieldCols + 3, 11);
 
             Write("Pos:", GameFieldCols + 3, 13);
-            Write($"{TetrominoRow}, {TetrominoCol}", GameFieldCols + 3, 14);
+            Write($"{State.TetrominoRow}, {State.TetrominoCol}", GameFieldCols + 3, 14);
 
             Write("Controls:", GameFieldCols + 3, 16);
             Write("   ^", GameFieldCols + 3, 17);
@@ -403,140 +380,10 @@ namespace TetrisCsConsole
             Write(" Space", GameFieldCols + 3, 20);
         }
 
-        static void UpdateLevel()
-        {
-            if (Score <= 0) { Level = 1; return; }
-            Level = (int)Math.Log10(Score) - 1;
-            if (Level < 1) Level = 1;
-            if (Level > 10) Level = 10;
-        }
-
         static void Write(string text, int col, int row)
         {
             Console.SetCursorPosition(col, row);
             Console.Write(text);
-        }
-
-        static void PlayMusic()
-        {
-            while (true)
-            {
-                const int soundLenght = 100;
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(990, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1188, soundLenght * 2);
-                Console.Beep(1320, soundLenght);
-                Console.Beep(1188, soundLenght);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(990, soundLenght * 2);
-                Console.Beep(880, soundLenght * 4);
-                Console.Beep(880, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1188, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(990, soundLenght * 6);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1188, soundLenght * 4);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1056, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Thread.Sleep(soundLenght * 2);
-                Console.Beep(1188, soundLenght * 4);
-                Console.Beep(1408, soundLenght * 2);
-                Console.Beep(1760, soundLenght * 4);
-                Console.Beep(1584, soundLenght * 2);
-                Console.Beep(1408, soundLenght * 2);
-                Console.Beep(1320, soundLenght * 6);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1188, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(990, soundLenght * 4);
-                Console.Beep(990, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1188, soundLenght * 4);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1056, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Thread.Sleep(soundLenght * 4);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(990, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1188, soundLenght * 2);
-                Console.Beep(1320, soundLenght);
-                Console.Beep(1188, soundLenght);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(990, soundLenght * 2);
-                Console.Beep(880, soundLenght * 4);
-                Console.Beep(880, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1188, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(990, soundLenght * 6);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1188, soundLenght * 4);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1056, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Thread.Sleep(soundLenght * 2);
-                Console.Beep(1188, soundLenght * 4);
-                Console.Beep(1408, soundLenght * 2);
-                Console.Beep(1760, soundLenght * 4);
-                Console.Beep(1584, soundLenght * 2);
-                Console.Beep(1408, soundLenght * 2);
-                Console.Beep(1320, soundLenght * 6);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1188, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(990, soundLenght * 4);
-                Console.Beep(990, soundLenght * 2);
-                Console.Beep(1056, soundLenght * 2);
-                Console.Beep(1188, soundLenght * 4);
-                Console.Beep(1320, soundLenght * 4);
-                Console.Beep(1056, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Console.Beep(880, soundLenght * 4);
-                Thread.Sleep(soundLenght * 4);
-                Console.Beep(660, soundLenght * 8);
-                Console.Beep(528, soundLenght * 8);
-                Console.Beep(594, soundLenght * 8);
-                Console.Beep(495, soundLenght * 8);
-                Console.Beep(528, soundLenght * 8);
-                Console.Beep(440, soundLenght * 8);
-                Console.Beep(419, soundLenght * 8);
-                Console.Beep(495, soundLenght * 8);
-                Console.Beep(660, soundLenght * 8);
-                Console.Beep(528, soundLenght * 8);
-                Console.Beep(594, soundLenght * 8);
-                Console.Beep(495, soundLenght * 8);
-                Console.Beep(528, soundLenght * 4);
-                Console.Beep(660, soundLenght * 4);
-                Console.Beep(880, soundLenght * 8);
-                Console.Beep(838, soundLenght * 16);
-                Console.Beep(660, soundLenght * 8);
-                Console.Beep(528, soundLenght * 8);
-                Console.Beep(594, soundLenght * 8);
-                Console.Beep(495, soundLenght * 8);
-                Console.Beep(528, soundLenght * 8);
-                Console.Beep(440, soundLenght * 8);
-                Console.Beep(419, soundLenght * 8);
-                Console.Beep(495, soundLenght * 8);
-                Console.Beep(660, soundLenght * 8);
-                Console.Beep(528, soundLenght * 8);
-                Console.Beep(594, soundLenght * 8);
-                Console.Beep(495, soundLenght * 8);
-                Console.Beep(528, soundLenght * 4);
-                Console.Beep(660, soundLenght * 4);
-                Console.Beep(880, soundLenght * 8);
-                Console.Beep(838, soundLenght * 16);
-            }
         }
     }
 }
