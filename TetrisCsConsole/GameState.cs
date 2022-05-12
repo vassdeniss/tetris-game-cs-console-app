@@ -6,24 +6,18 @@ namespace TetrisCsConsole
     {
         public GameState(int rows, int columns)
         {
-            GameField = new bool[rows, columns];
+            this.GameField = new bool[rows, columns];
 
-            HighScore = 0;
-            Score = 0;
-            Level = 1;
-            Frame = 0;
-            MoveFrame = 16;
-            CurrentTetromino = null;
-            TetrominoRow = 0;
-            TetrominoCol = 0;
-            LineScores = new int[] { 0, 40, 100, 300, 1200 };
+            this.Level = 1;
+            this.Frame = 0;
+            this.MoveFrame = 16;
+            this.CurrentTetromino = null;
+            this.TetrominoRow = 0;
+            this.TetrominoCol = 0;
+            this.LineScores = new int[] { 0, 40, 100, 300, 1200 };
         }
 
         public bool[,] GameField { get; private set; }
-
-        public int HighScore { get; set; }
-
-        public int Score { get; set; }
 
         public int Level { get; private set; }
 
@@ -31,7 +25,7 @@ namespace TetrisCsConsole
 
         public int MoveFrame { get; private set; }
 
-        public bool[,] CurrentTetromino { get; set; }
+        public Tetromino CurrentTetromino { get; set; }
 
         public int TetrominoRow { get; set; }
 
@@ -39,24 +33,24 @@ namespace TetrisCsConsole
 
         public int[] LineScores { get; private set; }
 
-        public void UpdateLevel()
+        public void UpdateLevel(int score)
         {
-            if (Score <= 0)
+            if (score <= 0)
             {
-                Level = 1;
+                this.Level = 1;
                 return;
             }
 
-            Level = (int)Math.Log10(Score) - 1;
+            this.Level = (int)Math.Log10(score) - 1;
 
-            if (Level < 1)
+            if (this.Level < 1)
             {
-                Level = 1;
+                this.Level = 1;
             }
 
-            if (Level > 10)
+            if (this.Level > 10)
             {
-                Level = 10;
+                this.Level = 10;
             }
         }
     }

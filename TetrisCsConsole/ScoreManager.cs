@@ -12,9 +12,23 @@ namespace TetrisCsConsole
         public ScoreManager(string fileName)
         {
             this.fileName = fileName;
+            this.HighScore = this.GetHighScore();
         }
 
-        public int GetHighScore()
+        public int Score { get; private set; }
+
+        public int HighScore { get; private set; }
+
+        public void AddScore(int score)
+        {
+            this.Score += score;
+            if (this.Score > this.HighScore)
+            {
+                this.HighScore = this.Score;
+            }
+        }
+
+        private int GetHighScore()
         {
             int highScore = 0;
 
@@ -32,11 +46,11 @@ namespace TetrisCsConsole
             return highScore;
         }
 
-        public void PostHighScore(int score)
+        public void PostHighScore()
         {
             File.AppendAllLines(fileName, new List<string>
             {
-                $"[{DateTime.Now}] {Environment.UserName} => {score}"
+                $"[{DateTime.Now}] {Environment.UserName} => {this.Score}"
             });
         }
     }

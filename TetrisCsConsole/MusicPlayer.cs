@@ -7,7 +7,7 @@ namespace TetrisCsConsole
     {
         public void Play()
         {
-            new Thread(PlayMusic).Start();
+            new Thread(this.PlayMusic).Start();
         }
 
         private void PlayMusic()
