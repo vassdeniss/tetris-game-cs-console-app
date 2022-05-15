@@ -8,10 +8,13 @@ namespace TetrisCsConsole
     public class ScoreManager
     {
         private readonly string fileName;
+        private readonly int[] lineScores;
 
         public ScoreManager(string fileName)
         {
             this.fileName = fileName;
+
+            this.lineScores = new int[] { 1, 40, 100, 300, 1200 };
             this.HighScore = this.GetHighScore();
         }
 
@@ -19,9 +22,9 @@ namespace TetrisCsConsole
 
         public int HighScore { get; private set; }
 
-        public void AddScore(int score)
+        public void AddScore(int lines, int level)
         {
-            this.Score += score;
+            this.Score += lineScores[lines] * level;
             if (this.Score > this.HighScore)
             {
                 this.HighScore = this.Score;

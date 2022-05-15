@@ -5,19 +5,23 @@ namespace TetrisCsConsole
 {
     public class ConsoleRender
     {
-        private int gameRows;
-        private int gameColumns;
-        private int infoColumns;
-        private int consoleRows;
-        private int consoleColumns;
+        private readonly int gameRows;
+        private readonly int gameColumns;
+        private readonly int infoColumns;
+        private readonly char tetroChar;
+        private readonly int consoleRows;
+        private readonly int consoleColumns;
 
-        public ConsoleRender(int gameRows = 20, int gameColumns = 10, int infoColumns = 11)
+        public ConsoleRender(int gameRows = 20, int gameColumns = 10, int infoColumns = 11, char tetroChar = '*')
         {
             this.gameRows = gameRows;
             this.gameColumns = gameColumns;
             this.infoColumns = infoColumns;
+            this.tetroChar = tetroChar;
             this.consoleRows = 1 + gameRows + 1;
             this.consoleColumns = 1 + gameColumns + 1 + infoColumns + 1;
+            this.Frame = 0;
+            this.MoveFrame = 16;
 
             Console.Title = "Tetris in the Console";
             Console.CursorVisible = false;
@@ -25,15 +29,19 @@ namespace TetrisCsConsole
             Console.SetBufferSize(consoleColumns, consoleRows + 1);
         }
 
-        public void RedrawUI(GameState state, ScoreManager manager)
+        public int Frame { get; set; }
+
+        public int MoveFrame { get; private set; }
+
+        public void RedrawUI(ILogic state, ScoreManager manager)
         {
             this.DrawBorder();
             this.DrawInfo(3 + this.gameColumns, state, manager);
             this.DrawField(state.GameField);
-            this.DrawTetromino(state.CurrentTetromino, state.TetrominoRow, state.TetrominoCol);
+            this.DrawTetromino(state.CurrentTetromino, state.CurrentTetrominoRow, state.CurrentTetrominoCol);
         }
 
-        public void DrawInfo(int column, GameState state, ScoreManager manager)
+        public void DrawInfo(int column, ILogic state, ScoreManager manager)
         {
             Console.ForegroundColor = ConsoleColor.Red;
 
@@ -47,10 +55,10 @@ namespace TetrisCsConsole
             this.Write(manager.HighScore.ToString(), column, 8);
 
             this.Write("Frame:", column, 10);
-            this.Write($"{state.Frame} / {state.MoveFrame - state.Level}", column, 11);
+            this.Write($"{this.Frame} / {this.MoveFrame - state.Level}", column, 11);
 
             this.Write("Pos:", column, 13);
-            this.Write($"{state.TetrominoRow}, {state.TetrominoCol}", column, 14);
+            this.Write($"{state.CurrentTetrominoRow}, {state.CurrentTetrominoCol}", column, 14);
 
             this.Write("Controls:", column, 16);
             this.Write("   ^", column, 17);
@@ -123,7 +131,7 @@ namespace TetrisCsConsole
             this.Write($"{scoreAsString}", row + 2, col + 4);
         }
 
-        public void DrawField(bool[,] field)    
+        public void DrawField(bool[,] field)
         {
             Console.ForegroundColor = ConsoleColor.DarkCyan;
             for (int row = 0; row < field.GetLength(0); row++)
@@ -131,7 +139,7 @@ namespace TetrisCsConsole
                 StringBuilder sb = new StringBuilder();
                 for (int col = 0; col < field.GetLength(1); col++)
                 {
-                    if (field[row, col]) sb.Append("*");
+                    if (field[row, col]) sb.Append(tetroChar.ToString());
                     else sb.Append(" ");
                 }
 
@@ -148,7 +156,7 @@ namespace TetrisCsConsole
                 {
                     if (tetromino.Shape[row, col])
                     {
-                        Write("*", 1 + tetroColumn + col, row + 1 + tetroRow);
+                        Write(tetroChar.ToString(), 1 + tetroColumn + col, row + 1 + tetroRow);
                     }
                 }
             }
